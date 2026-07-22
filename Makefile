@@ -2,13 +2,16 @@
 
 all: proto engine gateway
 
-# Generate protobuf code for both languages
+# Generate protobuf code for both languages.
+# (The C++ side also regenerates automatically at `cmake --build` time via
+# the generate_proto custom command in cpp-engine/CMakeLists.txt — this
+# target is mainly needed for the Go gateway, which has no such hook.)
 proto:
 	@echo "Generating protobuf code..."
 	mkdir -p go-gateway/gen cpp-engine/gen
 	protoc --proto_path=proto \
-		--go_out=go-gateway/gen --go_opt=paths=source_relative \
-		--go-grpc_out=go-gateway/gen --go-grpc_opt=paths=source_relative \
+		--go_out=go-gateway --go_opt=module=llm-server \
+		--go-grpc_out=go-gateway --go-grpc_opt=module=llm-server \
 		proto/gateway.proto proto/engine.proto
 	protoc --proto_path=proto \
 		--cpp_out=cpp-engine/gen \
