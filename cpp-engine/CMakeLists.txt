@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.16)
 project(inference-engine CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+include(FetchContent)
 
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
@@ -12,10 +13,28 @@ find_package(Protobuf REQUIRED)
 find_package(gRPC REQUIRED)
 find_package(Threads REQUIRED)
 
-# Optional: llama.cpp (only needed for --mode llama)
+# Optional: llama.cpp (only needed for --mode llama). Fetched via CMake
+# rather than vendored/submoduled, matching the GoogleTest pattern below —
+# no manual clone step, nothing checked into this repo. Pinned to a specific
+# commit (not a moving branch) so the build is reproducible; llama.cpp has
+# no regular version tags at this pin.
 option(WITH_LLAMA "Build with llama.cpp support" OFF)
 if(WITH_LLAMA)
-    add_subdirectory(third_party/llama.cpp)
+    set(LLAMA_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+    set(LLAMA_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(LLAMA_BUILD_SERVER OFF CACHE BOOL "" FORCE)
+    set(LLAMA_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
+    set(LLAMA_BUILD_APP OFF CACHE BOOL "" FORCE)
+    set(LLAMA_BUILD_COMMON OFF CACHE BOOL "" FORCE)
+    set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+
+    FetchContent_Declare(
+        llama_cpp
+        GIT_REPOSITORY https://github.com/ggml-org/llama.cpp.git
+        GIT_TAG 6d5a910c503df242457b2e83f4918d422c0a68ab
+        GIT_SHALLOW TRUE
+    )
+    FetchContent_MakeAvailable(llama_cpp)
 endif()
 
 # Generate protobuf/gRPC C++ sources for engine.proto at configure time so
@@ -76,7 +95,6 @@ target_link_libraries(engine PRIVATE engine_core)
 enable_testing()
 find_package(GTest QUIET)
 if(NOT GTest_FOUND)
-    include(FetchContent)
     FetchContent_Declare(
         googletest
         URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.tar.gz

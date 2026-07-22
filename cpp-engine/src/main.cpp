@@ -20,6 +20,9 @@ int main(int argc, char* argv[]) {
     bool static_batching = false;
     int mock_latency_us = 500;
     int mock_fixed_overhead_us = 0;
+    int n_ctx = 2048;
+    int n_gpu_layers = 0;
+    int n_threads = 4;
 
     for (int i = 1; i < argc; i++) {
         std::string arg = argv[i];
@@ -31,10 +34,14 @@ int main(int argc, char* argv[]) {
         else if (arg == "--static") static_batching = true;
         else if (arg == "--mock-latency-us" && i + 1 < argc) mock_latency_us = std::stoi(argv[++i]);
         else if (arg == "--mock-fixed-overhead-us" && i + 1 < argc) mock_fixed_overhead_us = std::stoi(argv[++i]);
+        else if (arg == "--n-ctx" && i + 1 < argc) n_ctx = std::stoi(argv[++i]);
+        else if (arg == "--n-gpu-layers" && i + 1 < argc) n_gpu_layers = std::stoi(argv[++i]);
+        else if (arg == "--n-threads" && i + 1 < argc) n_threads = std::stoi(argv[++i]);
         else if (arg == "--help") {
             std::cout << "Usage: engine [--mode mock|llama] [--model PATH] "
                          "[--listen ADDR] [--batch-size N] [--max-queue N] [--static] "
-                         "[--mock-latency-us N] [--mock-fixed-overhead-us N]\n";
+                         "[--mock-latency-us N] [--mock-fixed-overhead-us N] "
+                         "[--n-ctx N] [--n-gpu-layers N] [--n-threads N]\n";
             return 0;
         }
     }
@@ -43,8 +50,16 @@ int main(int argc, char* argv[]) {
     std::unique_ptr<TokenGenerator> generator;
     if (mode == "llama") {
 #ifdef WITH_LLAMA
+        if (model_path.empty()) {
+            std::cerr << "--mode llama requires --model PATH\n";
+            return 1;
+        }
         LlamaCppGenerator::Config cfg;
         cfg.model_path = model_path;
+        cfg.n_ctx = n_ctx;
+        cfg.n_gpu_layers = n_gpu_layers;
+        cfg.n_threads = n_threads;
+        cfg.max_batch_size = max_batch_size;
         generator = std::make_unique<LlamaCppGenerator>(cfg);
         std::cout << "Loaded model: " << model_path << "\n";
 #else

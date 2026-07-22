@@ -1,5 +1,6 @@
 ## Build artifacts
 cpp-engine/build/
+cpp-engine/build-llama/
 bin/
 
 ## Generated protobuf code

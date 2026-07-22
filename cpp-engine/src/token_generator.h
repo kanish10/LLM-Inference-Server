@@ -43,4 +43,14 @@ public:
 
     // The end-of-sequence token ID for this model.
     virtual int32_t eos_token_id() const = 0;
+
+    // Called by the scheduler exactly once per kv_slot, right after
+    // KVCacheAllocator::free(kv_slot) — i.e. when a sequence is evicted and
+    // that slot becomes reusable. Backends with their own per-sequence
+    // state keyed by kv_slot (real models: llama.cpp's internal KV cache,
+    // keyed by kv_slot as its seq_id) must clear it here, or the next
+    // sequence admitted into that slot inherits a stale, unrelated
+    // conversation's context. Default no-op: MockTokenGenerator is
+    // stateless across calls, so it has nothing to clear.
+    virtual void reset_sequence(int /*kv_slot*/) {}
 };

@@ -249,6 +249,7 @@ void ContinuousBatchScheduler::evict_finished() {
         [this](Sequence& seq) {
             if (seq.state == SequenceState::FINISHED) {
                 kv_cache_.free(seq.kv_slot);  // <-- THE KEY OPERATION
+                generator_->reset_sequence(seq.kv_slot);
                 metrics_.total_requests_completed.fetch_add(1);
                 return true;
             }
@@ -276,6 +277,7 @@ void ContinuousBatchScheduler::evict_finished_static() {
     if (all_done) {
         for (auto& seq : active_batch_) {
             kv_cache_.free(seq.kv_slot);
+            generator_->reset_sequence(seq.kv_slot);
             metrics_.total_requests_completed.fetch_add(1);
         }
         active_batch_.clear();
