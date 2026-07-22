@@ -1,4 +1,5 @@
 cpp-engine/build/
+cpp-engine/build-llama/
 cpp-engine/gen/
 go-gateway/gen/
 bin/

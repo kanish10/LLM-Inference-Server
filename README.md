@@ -134,11 +134,52 @@ if you change them.
 
 ## Real model inference (optional)
 
-Download a GGUF model into `models/` and build with `-DWITH_LLAMA=ON` to run the
-engine against real TinyLlama weights instead of the mock generator (`--mode llama
---model models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf`). See CLAUDE.md for details —
-this is polish on top of the core scheduler, not required to validate the
-scheduling algorithm itself.
+Polish on top of the core scheduler — the resume claims are about the
+scheduling algorithm, which the mock generator already exercises fully — but
+verified working end-to-end:
+
+```bash
+# Download TinyLlama (~669 MB; models/*.gguf is gitignored)
+curl -L -o models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf \
+    "https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf"
+
+# Build with llama.cpp support (fetched automatically by CMake — first
+# configure clones it, first build compiles it; both take a while)
+cmake -S cpp-engine -B cpp-engine/build-llama -DCMAKE_BUILD_TYPE=Release -DWITH_LLAMA=ON
+cmake --build cpp-engine/build-llama -j"$(nproc)"
+
+./cpp-engine/build-llama/engine --mode llama \
+    --model models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf \
+    --batch-size 8 --listen unix:///tmp/inference-engine.sock
+```
+
+Point the Go gateway at it exactly as with the mock engine. Sample output
+(temperature 0, greedy) confirming both real generation and correct KV-cache
+isolation across sequences sharing the same batch slots:
+
+```
+PROMPT: "The capital of France is"
+OUTPUT: " Paris.\n\n2. B.C. The capital of ancient Rome was Rome.\n\n"
+
+PROMPT: "The largest planet in the solar system is"
+OUTPUT: " Jupiter. It is also the most massive planet in the solar system,"
+
+PROMPT: "Water is made of hydrogen and"
+OUTPUT: " oxygen, which are the most abundant elements"
+```
+
+**KV cache reset was the real gap here.** llama.cpp owns its own internal KV
+cache, keyed by `llama_seq_id` — and every `Sequence::kv_slot` the scheduler
+hands a `TokenGenerator` doubles as that id. The original design never told
+the generator when a slot was freed, so a real model reusing an evicted slot
+would silently inherit a previous, unrelated conversation's KV state.
+`TokenGenerator::reset_sequence(kv_slot)` (default no-op, since the mock is
+stateless across calls) closes that gap; `LlamaCppGenerator` overrides it
+with `llama_memory_seq_rm`, and the scheduler calls it in both eviction
+paths right after `KVCacheAllocator::free()`. Verified above by running four
+sequential prompts through only 2 batch slots (`--batch-size 2`) and
+confirming each output stayed on-topic rather than drifting into the
+previous prompt's continuation.
 
 ## Docker / Grafana
 
