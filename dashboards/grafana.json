@@ -1,0 +1,78 @@
+{
+  "title": "LLM Inference Server — Continuous Batching",
+  "uid": "llm-inference-server",
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5s",
+  "time": { "from": "now-15m", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Request Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        { "expr": "rate(inference_requests_total[1m])", "legendFormat": "accepted/s" },
+        { "expr": "rate(inference_requests_rejected_total[1m])", "legendFormat": "rejected/s" }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Active Requests",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        { "expr": "inference_requests_active", "legendFormat": "active" }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Time to First Token (p50 / p99)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, rate(inference_ttft_ms_bucket[5m]))", "legendFormat": "p50" },
+        { "expr": "histogram_quantile(0.99, rate(inference_ttft_ms_bucket[5m]))", "legendFormat": "p99" }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "End-to-End Request Duration (p50 / p99)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, rate(inference_request_duration_ms_bucket[5m]))", "legendFormat": "p50" },
+        { "expr": "histogram_quantile(0.99, rate(inference_request_duration_ms_bucket[5m]))", "legendFormat": "p99" }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Tokens Generated / sec",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "targets": [
+        { "expr": "rate(inference_tokens_generated_total[1m])", "legendFormat": "tokens/s" }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Engine Batch Occupancy",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "fieldConfig": { "defaults": { "unit": "percentunit" }, "overrides": [] },
+      "targets": [
+        { "expr": "inference_batch_occupancy_pct", "legendFormat": "occupancy" }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Engine Queue Depth",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 24 },
+      "targets": [
+        { "expr": "inference_queue_depth", "legendFormat": "queue depth" }
+      ]
+    }
+  ]
+}

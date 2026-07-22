@@ -107,6 +107,19 @@ engine against real TinyLlama weights instead of the mock generator (`--mode lla
 this is polish on top of the core scheduler, not required to validate the
 scheduling algorithm itself.
 
+## Docker / Grafana
+
+```bash
+cd docker && docker compose up --build
+```
+
+Builds and runs the engine and gateway containers (sharing a Unix socket over
+a named volume), plus Prometheus (scraping the gateway's `/metrics`) and
+Grafana (pre-provisioned with a Prometheus datasource and the dashboard in
+`dashboards/grafana.json`). Grafana is at `http://localhost:3000` (anonymous
+viewer access enabled; admin/admin for the admin account), Prometheus at
+`http://localhost:9091`, the gateway gRPC port at `localhost:50051`.
+
 ## What this is / isn't
 
 This isolates the ~500-line core scheduling algorithm to understand and demonstrate

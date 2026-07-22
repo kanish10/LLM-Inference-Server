@@ -1,0 +1,27 @@
+# Multi-stage build for the C++ inference engine.
+FROM ubuntu:24.04 AS build
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential cmake git pkg-config \
+    protobuf-compiler libprotobuf-dev protobuf-compiler-grpc \
+    libgrpc++-dev libgrpc-dev libgtest-dev ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /src
+COPY proto ./proto
+COPY cpp-engine ./cpp-engine
+
+RUN cmake -S cpp-engine -B cpp-engine/build -DCMAKE_BUILD_TYPE=Release \
+    && cmake --build cpp-engine/build --target engine -j"$(nproc)"
+
+FROM ubuntu:24.04 AS runtime
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libprotobuf32t64 libgrpc++1.51t64 libgrpc29t64 ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=build /src/cpp-engine/build/engine /usr/local/bin/engine
+
+# Unix domain socket shared with the gateway container via a volume.
+VOLUME ["/sockets"]
+ENTRYPOINT ["/usr/local/bin/engine"]
+CMD ["--mode", "mock", "--listen", "unix:///sockets/inference-engine.sock"]

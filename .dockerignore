@@ -1,0 +1,12 @@
+cpp-engine/build/
+cpp-engine/gen/
+go-gateway/gen/
+bin/
+benchmark/venv/
+benchmark/__pycache__/
+benchmark/*.csv
+benchmark/*.png
+benchmark/summary.txt
+benchmark/gateway_pb2*.py
+models/*.gguf
+.git/
