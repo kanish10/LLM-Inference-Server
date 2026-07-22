@@ -1,0 +1,31 @@
+# Multi-stage build for the Go gateway. Generates its own protobuf stubs
+# rather than depending on a pre-existing go-gateway/gen/ on disk, so the
+# image builds reproducibly from a clean checkout without a `make proto`
+# step first.
+FROM golang:1.25-bookworm AS build
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    protobuf-compiler && rm -rf /var/lib/apt/lists/*
+RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.11 \
+    && go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.2
+ENV PATH="/root/go/bin:${PATH}"
+
+WORKDIR /src
+COPY proto ./proto
+COPY go-gateway/go.mod go-gateway/go.sum ./go-gateway/
+RUN cd go-gateway && go mod download
+
+COPY go-gateway/ ./go-gateway/
+RUN protoc --proto_path=proto \
+        --go_out=go-gateway --go_opt=module=llm-server \
+        --go-grpc_out=go-gateway --go-grpc_opt=module=llm-server \
+        proto/gateway.proto proto/engine.proto \
+    && cd go-gateway && CGO_ENABLED=0 go build -o /gateway .
+
+FROM gcr.io/distroless/static-debian12
+COPY --from=build /gateway /gateway
+
+VOLUME ["/sockets"]
+EXPOSE 50051 9090
+ENTRYPOINT ["/gateway"]
+CMD ["--engine", "unix:///sockets/inference-engine.sock", "--listen", ":50051", "--metrics", ":9090"]

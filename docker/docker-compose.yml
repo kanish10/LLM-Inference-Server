@@ -1,0 +1,47 @@
+services:
+  engine:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.engine
+    command: ["--mode", "mock", "--listen", "unix:///sockets/inference-engine.sock"]
+    volumes:
+      - sockets:/sockets
+
+  gateway:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.gateway
+    depends_on:
+      - engine
+    ports:
+      - "50051:50051"
+      - "9090:9090"
+    volumes:
+      - sockets:/sockets
+
+  prometheus:
+    image: prom/prometheus:latest
+    depends_on:
+      - gateway
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+
+  grafana:
+    image: grafana/grafana:latest
+    depends_on:
+      - prometheus
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+    volumes:
+      - ../dashboards:/etc/grafana/provisioning/dashboards/json
+      - ./grafana-dashboard-provider.yml:/etc/grafana/provisioning/dashboards/provider.yml:ro
+      - ./grafana-datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml:ro
+
+volumes:
+  sockets:
