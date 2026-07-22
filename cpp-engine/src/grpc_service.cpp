@@ -36,23 +36,40 @@ grpc::Status EngineServiceImpl::SubmitRequest(
                            "Queue full");
     }
 
-    // Stream tokens until done
+    // Stream tokens until done. Waits with a timeout (rather than an
+    // unbounded cv.wait) so a request that's still WAITING in the
+    // scheduler's queue — and so has never had a token pushed onto
+    // stream->tokens — still notices client cancellation. Without this, a
+    // client that disconnects while its request is stuck in queue (e.g.
+    // under sustained overload) leaks this handler thread forever: a plain
+    // cv.wait() only wakes on a new token or completion, cancelling the
+    // gRPC call doesn't interrupt an application-level condition variable,
+    // and grpc::Server::Shutdown() then blocks waiting for this handler to
+    // return.
     while (true) {
         engine::EngineToken token;
+        bool have_token = false;
         {
             std::unique_lock<std::mutex> lock(stream->mu);
-            stream->cv.wait(lock, [&] {
+            bool signaled = stream->cv.wait_for(lock, std::chrono::milliseconds(100), [&] {
                 return !stream->tokens.empty() || stream->done;
             });
 
+            if (!signaled) {
+                if (context->IsCancelled()) break;
+                continue;
+            }
             if (stream->tokens.empty() && stream->done) break;
 
             token = std::move(stream->tokens.front());
             stream->tokens.pop();
+            have_token = true;
         }
 
-        if (!writer->Write(token)) break;  // client disconnected
-        if (token.is_finished()) break;
+        if (have_token) {
+            if (!writer->Write(token)) break;  // client disconnected
+            if (token.is_finished()) break;
+        }
     }
 
     // Cleanup
