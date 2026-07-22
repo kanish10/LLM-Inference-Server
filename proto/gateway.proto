@@ -1,0 +1,45 @@
+syntax = "proto3";
+package gateway;
+option go_package = "llm-server/gen/gateway";
+
+service InferenceService {
+  // Streaming: client sends one request, receives a stream of tokens
+  rpc Generate(GenerateRequest) returns (stream GenerateResponse);
+  // Health check
+  rpc Health(HealthRequest) returns (HealthResponse);
+}
+
+message GenerateRequest {
+  string prompt = 1;
+  int32 max_tokens = 2;          // max new tokens to generate
+  float temperature = 3;         // sampling temperature (0.0 = greedy)
+  repeated string stop = 4;      // stop sequences (optional)
+}
+
+message GenerateResponse {
+  string token = 1;              // detokenized text for this token
+  bool is_finished = 2;
+  FinishReason finish_reason = 3;
+  UsageStats usage = 4;          // populated only on final message
+}
+
+enum FinishReason {
+  FINISH_REASON_NONE = 0;
+  FINISH_REASON_STOP = 1;        // hit a stop sequence
+  FINISH_REASON_LENGTH = 2;      // hit max_tokens
+  FINISH_REASON_EOS = 3;         // model emitted EOS token
+}
+
+message UsageStats {
+  int32 prompt_tokens = 1;
+  int32 completion_tokens = 2;
+  float time_to_first_token_ms = 3;
+  float total_time_ms = 4;
+}
+
+message HealthRequest {}
+message HealthResponse {
+  bool ready = 1;
+  int32 queue_depth = 2;
+  int32 active_requests = 3;
+}

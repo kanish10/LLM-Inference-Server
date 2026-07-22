@@ -1,0 +1,87 @@
+#include "grpc_service.h"
+#include "mock_generator.h"
+#include "scheduler.h"
+#ifdef WITH_LLAMA
+#include "llama_generator.h"
+#endif
+#include <grpcpp/grpcpp.h>
+#include <iostream>
+#include <string>
+#include <thread>
+
+int main(int argc, char* argv[]) {
+    // Parse CLI flags (keep it simple — no library needed)
+    std::string mode = "mock";        // "mock" or "llama"
+    std::string model_path;
+    std::string listen_addr = "unix:///tmp/inference-engine.sock";
+    int max_batch_size = 8;
+    int max_queue_depth = 64;
+    bool static_batching = false;
+
+    for (int i = 1; i < argc; i++) {
+        std::string arg = argv[i];
+        if (arg == "--mode" && i + 1 < argc) mode = argv[++i];
+        else if (arg == "--model" && i + 1 < argc) model_path = argv[++i];
+        else if (arg == "--listen" && i + 1 < argc) listen_addr = argv[++i];
+        else if (arg == "--batch-size" && i + 1 < argc) max_batch_size = std::stoi(argv[++i]);
+        else if (arg == "--max-queue" && i + 1 < argc) max_queue_depth = std::stoi(argv[++i]);
+        else if (arg == "--static") static_batching = true;
+        else if (arg == "--help") {
+            std::cout << "Usage: engine [--mode mock|llama] [--model PATH] "
+                         "[--listen ADDR] [--batch-size N] [--max-queue N] [--static]\n";
+            return 0;
+        }
+    }
+
+    // Create token generator
+    std::unique_ptr<TokenGenerator> generator;
+    if (mode == "llama") {
+#ifdef WITH_LLAMA
+        LlamaCppGenerator::Config cfg;
+        cfg.model_path = model_path;
+        generator = std::make_unique<LlamaCppGenerator>(cfg);
+        std::cout << "Loaded model: " << model_path << "\n";
+#else
+        std::cerr << "Engine was built without WITH_LLAMA support. "
+                     "Rebuild with -DWITH_LLAMA=ON.\n";
+        return 1;
+#endif
+    } else {
+        generator = std::make_unique<MockTokenGenerator>();
+        std::cout << "Using mock generator\n";
+    }
+
+    // Create scheduler
+    ContinuousBatchScheduler::Config sched_config;
+    sched_config.max_batch_size = max_batch_size;
+    sched_config.max_queue_depth = max_queue_depth;
+    sched_config.static_batching = static_batching;
+    ContinuousBatchScheduler scheduler(sched_config, std::move(generator));
+
+    std::cout << "Scheduling mode: "
+              << (static_batching ? "static" : "continuous") << "\n";
+
+    // Create gRPC service
+    EngineServiceImpl service(&scheduler);
+
+    // Start gRPC server
+    grpc::ServerBuilder builder;
+    builder.AddListeningPort(listen_addr,
+                             grpc::InsecureServerCredentials());
+    builder.RegisterService(&service);
+    auto server = builder.BuildAndStart();
+    if (!server) {
+        std::cerr << "Failed to start gRPC server on " << listen_addr << "\n";
+        return 1;
+    }
+    std::cout << "Engine listening on " << listen_addr << "\n";
+
+    // Start scheduler on dedicated thread
+    std::thread scheduler_thread([&scheduler] { scheduler.run(); });
+
+    server->Wait();
+
+    scheduler.stop();
+    scheduler_thread.join();
+    return 0;
+}
