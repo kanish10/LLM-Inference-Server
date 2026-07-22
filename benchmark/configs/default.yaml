@@ -1,0 +1,7 @@
+# Default benchmark configuration. CLI flags in benchmark.py override these.
+target: localhost:50051
+requests: 500
+arrival_rate: 20.0     # mean requests/second (Poisson process)
+min_tokens: 16
+max_tokens: 512
+seed: 42

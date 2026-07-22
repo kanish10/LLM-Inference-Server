@@ -5,6 +5,7 @@
 #include "llama_generator.h"
 #endif
 #include <grpcpp/grpcpp.h>
+#include <chrono>
 #include <iostream>
 #include <string>
 #include <thread>
@@ -17,6 +18,8 @@ int main(int argc, char* argv[]) {
     int max_batch_size = 8;
     int max_queue_depth = 64;
     bool static_batching = false;
+    int mock_latency_us = 500;
+    int mock_fixed_overhead_us = 0;
 
     for (int i = 1; i < argc; i++) {
         std::string arg = argv[i];
@@ -26,9 +29,12 @@ int main(int argc, char* argv[]) {
         else if (arg == "--batch-size" && i + 1 < argc) max_batch_size = std::stoi(argv[++i]);
         else if (arg == "--max-queue" && i + 1 < argc) max_queue_depth = std::stoi(argv[++i]);
         else if (arg == "--static") static_batching = true;
+        else if (arg == "--mock-latency-us" && i + 1 < argc) mock_latency_us = std::stoi(argv[++i]);
+        else if (arg == "--mock-fixed-overhead-us" && i + 1 < argc) mock_fixed_overhead_us = std::stoi(argv[++i]);
         else if (arg == "--help") {
             std::cout << "Usage: engine [--mode mock|llama] [--model PATH] "
-                         "[--listen ADDR] [--batch-size N] [--max-queue N] [--static]\n";
+                         "[--listen ADDR] [--batch-size N] [--max-queue N] [--static] "
+                         "[--mock-latency-us N] [--mock-fixed-overhead-us N]\n";
             return 0;
         }
     }
@@ -47,8 +53,12 @@ int main(int argc, char* argv[]) {
         return 1;
 #endif
     } else {
-        generator = std::make_unique<MockTokenGenerator>();
-        std::cout << "Using mock generator\n";
+        MockTokenGenerator::Config mock_config;
+        mock_config.latency_per_token = std::chrono::microseconds(mock_latency_us);
+        mock_config.fixed_overhead = std::chrono::microseconds(mock_fixed_overhead_us);
+        generator = std::make_unique<MockTokenGenerator>(mock_config);
+        std::cout << "Using mock generator (latency_per_token=" << mock_latency_us
+                  << "us, fixed_overhead=" << mock_fixed_overhead_us << "us)\n";
     }
 
     // Create scheduler
