@@ -81,6 +81,24 @@ traffic with output lengths sampled uniformly from [16, 512] tokens. The result
 (`benchmark_results.png`, `summary.txt`) is the throughput ratio that backs the
 resume claim.
 
+**Mock latency model matters here.** `MockTokenGenerator::forward()` sleeps
+`fixed_overhead + latency_per_token * batch_size`. With `fixed_overhead = 0`
+(the constructor default, kept for scheduler-test determinism), per-step cost
+is exactly proportional to how many sequences are actively decoding — so an
+underfull static batch (six slots occupied by finished-but-unevicted
+sequences) costs exactly as much per active sequence as a full one, and the
+aggregate throughput gap between static and continuous batching disappears.
+Real batched inference isn't like that: reading model weights from memory is
+a large per-step cost independent of batch size, amortized over however many
+sequences are actually in the batch. `make bench` passes
+`--mock-fixed-overhead-us 2000 --mock-latency-us 100` to reproduce that, and
+`ARRIVAL_RATE=2.4` (~80% of the static engine's measured capacity at
+`--batch-size 8` with those settings — static's capacity collapses sharply
+above ~3 req/s in this configuration, while continuous stays comfortable past
+10 req/s). Override any of `MOCK_LATENCY_US`, `MOCK_FIXED_OVERHEAD_US`,
+`BATCH_SIZE`, `ARRIVAL_RATE`, `BENCH_REQUESTS` as `make` variables to
+re-tune for a different machine.
+
 ## Real model inference (optional)
 
 Download a GGUF model into `models/` and build with `-DWITH_LLAMA=ON` to run the

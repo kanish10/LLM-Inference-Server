@@ -12,8 +12,11 @@ MockTokenGenerator::MockTokenGenerator(Config config)
 
 TokenGenerator::BatchOutput
 MockTokenGenerator::forward(const BatchInput& input) {
-    // Simulate compute: latency scales with batch size
-    auto total_latency = config_.latency_per_token * input.entries.size();
+    // Simulate compute: a fixed per-step cost plus a marginal cost per
+    // sequence in the batch (see mock_generator.h for why the fixed term
+    // matters for this benchmark).
+    auto total_latency = config_.fixed_overhead +
+                          config_.latency_per_token * input.entries.size();
     std::this_thread::sleep_for(total_latency);
 
     BatchOutput output;

@@ -1,4 +1,17 @@
-.PHONY: all engine gateway proto test test-cpp test-go bench bench-mock clean
+.PHONY: all engine gateway proto test test-cpp test-go bench clean
+
+# Mock-generator tuning for `bench`: a real batched forward pass has a large
+# per-step fixed cost (reading model weights) that's amortized across the
+# batch, plus a small marginal cost per sequence. Without the fixed term,
+# static batching's idle (finished-but-unevicted) slots don't cost anything
+# extra, and the whole point of the benchmark disappears — see
+# cpp-engine/src/mock_generator.h. ARRIVAL_RATE is calibrated to ~80% of the
+# static baseline's measured capacity at these settings (see README).
+MOCK_LATENCY_US ?= 100
+MOCK_FIXED_OVERHEAD_US ?= 2000
+BATCH_SIZE ?= 8
+ARRIVAL_RATE ?= 2.4
+BENCH_REQUESTS ?= 500
 
 all: proto engine gateway
 
@@ -42,18 +55,24 @@ test-go:
 # Run benchmark (both modes) against the mock generator
 bench: all
 	@echo "Starting engine (continuous)..."
-	./cpp-engine/build/engine --mode mock --listen unix:///tmp/inference-engine.sock &
+	./cpp-engine/build/engine --mode mock --batch-size $(BATCH_SIZE) --max-queue 256 \
+		--mock-latency-us $(MOCK_LATENCY_US) --mock-fixed-overhead-us $(MOCK_FIXED_OVERHEAD_US) \
+		--listen unix:///tmp/inference-engine.sock &
 	sleep 1
-	./bin/gateway --engine unix:///tmp/inference-engine.sock &
+	./bin/gateway --engine unix:///tmp/inference-engine.sock --max-queue 256 &
 	sleep 1
-	cd benchmark && python3 benchmark.py --output results_continuous.csv
+	cd benchmark && python3 benchmark.py --requests $(BENCH_REQUESTS) --arrival-rate $(ARRIVAL_RATE) \
+		--output results_continuous.csv
 	-pkill -f 'cpp-engine/build/engine' ; pkill -f 'bin/gateway'
 	@echo "Starting engine (static)..."
-	./cpp-engine/build/engine --mode mock --static --listen unix:///tmp/inference-engine.sock &
+	./cpp-engine/build/engine --mode mock --static --batch-size $(BATCH_SIZE) --max-queue 256 \
+		--mock-latency-us $(MOCK_LATENCY_US) --mock-fixed-overhead-us $(MOCK_FIXED_OVERHEAD_US) \
+		--listen unix:///tmp/inference-engine.sock &
 	sleep 1
-	./bin/gateway --engine unix:///tmp/inference-engine.sock &
+	./bin/gateway --engine unix:///tmp/inference-engine.sock --max-queue 256 &
 	sleep 1
-	cd benchmark && python3 benchmark.py --output results_static.csv
+	cd benchmark && python3 benchmark.py --requests $(BENCH_REQUESTS) --arrival-rate $(ARRIVAL_RATE) \
+		--output results_static.csv
 	-pkill -f 'cpp-engine/build/engine' ; pkill -f 'bin/gateway'
 	@echo "Analyzing..."
 	cd benchmark && python3 analyze.py results_continuous.csv results_static.csv

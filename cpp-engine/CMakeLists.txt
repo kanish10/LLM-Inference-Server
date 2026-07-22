@@ -88,6 +88,7 @@ endif()
 add_executable(tests
     tests/scheduler_test.cpp
     tests/kv_cache_test.cpp
+    tests/mock_generator_test.cpp
 )
 target_include_directories(tests PRIVATE src ${GEN_DIR})
 target_link_libraries(tests PRIVATE
