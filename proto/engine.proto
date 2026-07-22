@@ -1,0 +1,44 @@
+syntax = "proto3";
+package engine;
+option go_package = "llm-server/gen/engine";
+
+service InferenceEngine {
+  // Submit a request; receive a stream of tokens as they're generated
+  rpc SubmitRequest(EngineRequest) returns (stream EngineToken);
+  // Pull current scheduler metrics
+  rpc GetMetrics(MetricsRequest) returns (EngineMetrics);
+}
+
+message EngineRequest {
+  string request_id = 1;
+  string prompt = 2;              // raw text; engine tokenizes internally
+  int32 max_new_tokens = 3;
+  float temperature = 4;
+}
+
+message EngineToken {
+  string request_id = 1;
+  int32 token_id = 2;
+  string text = 3;                // detokenized
+  bool is_finished = 4;
+  FinishReason finish_reason = 5;
+}
+
+enum FinishReason {
+  FINISH_REASON_NONE = 0;
+  FINISH_REASON_EOS = 1;
+  FINISH_REASON_LENGTH = 2;
+}
+
+message MetricsRequest {}
+
+message EngineMetrics {
+  int64 total_tokens_generated = 1;
+  int32 current_batch_size = 2;
+  int32 max_batch_size = 3;
+  int32 queue_depth = 4;
+  float batch_occupancy_pct = 5;   // rolling average
+  float tokens_per_second = 6;     // rolling window
+  int32 kv_cache_slots_used = 7;
+  int32 kv_cache_slots_total = 8;
+}

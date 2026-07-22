@@ -1,0 +1,35 @@
+## Build artifacts
+cpp-engine/build/
+bin/
+
+## Generated protobuf code
+go-gateway/gen/**/*.go
+cpp-engine/gen/*.pb.h
+cpp-engine/gen/*.pb.cc
+
+## Go
+go-gateway/*.exe
+go-gateway/vendor/
+
+## Python
+benchmark/__pycache__/
+benchmark/*.pyc
+benchmark/venv/
+benchmark/*.egg-info/
+benchmark/gateway_pb2.py
+benchmark/gateway_pb2_grpc.py
+benchmark/*.csv
+benchmark/*.png
+benchmark/summary.txt
+
+## Models (large binary files)
+models/*.gguf
+
+## Editor / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+## Logs
+*.log
