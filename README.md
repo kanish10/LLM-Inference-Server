@@ -194,6 +194,17 @@ Grafana (pre-provisioned with a Prometheus datasource and the dashboard in
 viewer access enabled; admin/admin for the admin account), Prometheus at
 `http://localhost:9091`, the gateway gRPC port at `localhost:50051`.
 
+## GPU engine (experimental, in progress)
+
+`gpu-engine/` is a from-scratch CUDA decode path for GPT-2 124M (cuBLAS GEMMs,
+custom fused kernels, paged KV-cache, CUDA Graphs) intended to eventually replace
+the mock/llama.cpp decode step above with real GPU compute. See
+`gpu-engine/CLAUDE.md` for the full spec and `gpu-engine/VERIFICATION.md` for
+exactly what has and hasn't been measured — the export pipeline and CPU-FP32
+oracle are real and verified against HuggingFace `gpt2`; the CUDA kernels and
+engine orchestration are written to spec but unverified pending access to
+NVIDIA GPU hardware (this repo was developed on a machine with none).
+
 ## What this is / isn't
 
 This isolates the ~500-line core scheduling algorithm to understand and demonstrate

@@ -26,6 +26,13 @@ benchmark/summary.txt
 ## Models (large binary files)
 models/*.gguf
 
+## gpu-engine
+gpu-engine/build/
+gpu-engine/export/venv/
+gpu-engine/export/__pycache__/
+gpu-engine/models/*.bin
+gpu-engine/models/*.json
+
 ## Editor / OS
 .vscode/
 .idea/
