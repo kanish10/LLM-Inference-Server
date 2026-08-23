@@ -172,18 +172,36 @@ Did not chase a bigger number by tuning the arrival-rate calibration
 further -- that would be exactly the kind of cherry-picking the HONESTY
 constraint exists to prevent. This is what it measures.
 
-## Skipped: M7 (Nsight Compute)
+## M7 (Nsight Compute) — real data, on a different rental
 
-Not a per-host issue — confirmed structural. Vast.ai's own docs state
-renters can only configure env vars/hostname/ports on the container, no
-`--cap-add=SYS_ADMIN` or privileged mode; checked this instance's actual
-`/proc/self/status` capability bitmask directly and it has neither
-`CAP_SYS_ADMIN` nor the newer `CAP_PERFMON` (which R565+ drivers also
-accept) that `ncu` needs to read GPU performance counters
-(`ERR_NVGPUCTRPERM`, reproduced directly). RunPod has the identical
-restriction for the same reason (shared container hosting). Costs exactly
-one claim — occupancy `[X%]→[Y%]` from fusion — everything else in the
-protocol table comes from CUDA-event timing or `ctest`, both unaffected.
+First attempt confirmed a structural block, not a per-host issue: Vast.ai's
+own docs state renters can only configure env vars/hostname/ports on a
+*container* instance, no `--cap-add=SYS_ADMIN` or privileged mode; the
+first rented RTX 3060's `/proc/self/status` capability bitmask had neither
+`CAP_SYS_ADMIN` nor `CAP_PERFMON`, and `ncu` reproduced `ERR_NVGPUCTRPERM`
+directly. RunPod has the identical restriction, same underlying reason.
+
+A second Vast.ai rental — a genuine **VM** instance (real `/sbin/init` as
+PID 1, systemd, no container wrapper) rather than a Docker container — had
+`CapEff = 0x1ffffffffff`: both `CAP_SYS_ADMIN` and `CAP_PERFMON` present.
+Installed CUDA 12.8 toolkit + `cuda-nsight-compute-12-8` via apt (explicitly
+*not* the `cuda`/`cuda-drivers` metapackages, to avoid touching the driver —
+this box was concurrently running an unrelated project, verified idle GPU
+and no process contention before and after every step). `ncu` worked
+immediately, no permission error. Built the full project on this box and
+ran the real profiling pass — see `bench/results/ncu_summary.md` and
+`bench/results/ncu_fused-asis.csv`.
+
+**Still not fully M7 per the letter of `CLAUDE.md`**: no before/after-fusion
+delta exists (same root cause as M4's skip — the kernels were written fused
+from the start, no unfused variant to diff against), so the specific
+"occupancy `[X%]→[Y%]` from fusion" claim still can't be made. What *does*
+exist now: real achieved-occupancy, DRAM-throughput, L2-hit-rate, and
+register-count numbers for every custom kernel and the cuBLAS GEMMs. Topline
+finding: every kernel sits at 8–17% achieved occupancy — GPT-2 124M at
+batch 8 is too small a workload to fill an RTX 3060, the same conclusion
+M5 already pointed at (flat per-step latency across batch 1→8) from a
+different angle.
 
 Known, deliberate deviations from the literal `CLAUDE.md` kernel-design
 suggestions (documented in-file, called out again here because they affect
