@@ -1,0 +1,714 @@
+<title>GPT-2 Decode Verification</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F6F7F9;
+    --surface: #FFFFFF;
+    --surface-2: #EEF1F4;
+    --border: #DDE2E7;
+    --text: #14181D;
+    --text-muted: #57616B;
+    --text-faint: #838C94;
+    --accent: #C9701A;
+    --accent-ink: #7A4712;
+    --baseline: #2E6DA4;
+    --baseline-ink: #204E78;
+    --good: #1A7F37;
+    --good-bg: #DEF3E3;
+    --gold: #9A6700;
+    --gold-bg: #FBEEC9;
+    --skip: #57616B;
+    --skip-bg: #E7EAED;
+    --shadow: 0 1px 2px rgba(20,24,29,0.06), 0 8px 24px rgba(20,24,29,0.05);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0D1117;
+      --surface: #151B23;
+      --surface-2: #1C2530;
+      --border: #2A3542;
+      --text: #E6EDF3;
+      --text-muted: #8B98A5;
+      --text-faint: #5C6773;
+      --accent: #C46E1F;
+      --accent-ink: #F0AE6E;
+      --baseline: #3E8FC7;
+      --baseline-ink: #8FC4EC;
+      --good: #3FB950;
+      --good-bg: #113321;
+      --gold: #D4A72C;
+      --gold-bg: #3A2E0C;
+      --skip: #8B98A5;
+      --skip-bg: #202932;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 28px rgba(0,0,0,0.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0D1117;
+    --surface: #151B23;
+    --surface-2: #1C2530;
+    --border: #2A3542;
+    --text: #E6EDF3;
+    --text-muted: #8B98A5;
+    --text-faint: #5C6773;
+    --accent: #C46E1F;
+    --accent-ink: #F0AE6E;
+    --baseline: #3E8FC7;
+    --baseline-ink: #8FC4EC;
+    --good: #3FB950;
+    --good-bg: #113321;
+    --gold: #D4A72C;
+    --gold-bg: #3A2E0C;
+    --skip: #8B98A5;
+    --skip-bg: #202932;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 28px rgba(0,0,0,0.35);
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "IBM Plex Sans", -apple-system, "Segoe UI", sans-serif;
+    font-size: 16px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .page {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 56px 24px 96px;
+  }
+  h1, h2, h3, .mono {
+    font-family: "IBM Plex Mono", ui-monospace, "SF Mono", monospace;
+  }
+  h1, h2, h3 { text-wrap: balance; margin: 0; }
+  .num { font-variant-numeric: tabular-nums; }
+  a { color: inherit; }
+
+  /* ---------- header ---------- */
+  header {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding-bottom: 40px;
+    border-bottom: 1px solid var(--border);
+  }
+  .eyebrow {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12.5px;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .eyebrow .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--good);
+    box-shadow: 0 0 0 3px var(--good-bg);
+  }
+  h1 {
+    font-size: clamp(28px, 4.4vw, 38px);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+  .subtitle {
+    font-size: 16.5px;
+    color: var(--text-muted);
+    max-width: 62ch;
+  }
+  .subtitle code {
+    font-family: "IBM Plex Mono", monospace;
+    background: var(--surface-2);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 0.92em;
+    color: var(--text);
+  }
+  .badges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+  .badge {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 5px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    background: var(--surface);
+  }
+
+  /* ---------- headline stats ---------- */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    margin: 40px 0;
+  }
+  .stat {
+    background: var(--surface);
+    padding: 24px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .stat .value {
+    font-size: clamp(30px, 4vw, 40px);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1;
+  }
+  .stat .value.accent { color: var(--accent-ink); }
+  .stat .label {
+    font-size: 13px;
+    color: var(--text-muted);
+    line-height: 1.4;
+  }
+
+  section { margin-top: 56px; }
+  .section-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 18px;
+  }
+  .section-head h2 {
+    font-size: 20px;
+    font-weight: 700;
+  }
+  .section-head .tag {
+    font-size: 12px;
+    color: var(--text-faint);
+    white-space: nowrap;
+  }
+  .lede {
+    color: var(--text-muted);
+    font-size: 15px;
+    max-width: 72ch;
+    margin-bottom: 22px;
+  }
+  .lede strong { color: var(--text); font-weight: 600; }
+
+  /* ---------- ledger table ---------- */
+  .ledger {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    background: var(--surface);
+  }
+  .ledger-row {
+    display: grid;
+    grid-template-columns: 76px 168px 1fr;
+    gap: 16px;
+    padding: 14px 18px;
+    align-items: start;
+    border-top: 1px solid var(--border);
+  }
+  .ledger-row:first-child { border-top: none; }
+  .ledger-row .m {
+    font-family: "IBM Plex Mono", monospace;
+    font-weight: 600;
+    font-size: 13.5px;
+    color: var(--text-faint);
+    padding-top: 2px;
+  }
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    padding: 4px 9px;
+    border-radius: 100px;
+    width: fit-content;
+    white-space: nowrap;
+  }
+  .pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; }
+  .pill.good { background: var(--good-bg); color: var(--good); }
+  .pill.good::before { background: var(--good); }
+  .pill.gold { background: var(--gold-bg); color: var(--gold); }
+  .pill.gold::before { background: var(--gold); }
+  .pill.skip { background: var(--skip-bg); color: var(--skip); }
+  .pill.skip::before { background: var(--skip); }
+  .ledger-row .finding { font-size: 14.5px; color: var(--text-muted); }
+  .ledger-row .finding strong { color: var(--text); font-weight: 600; }
+
+  /* ---------- panel ---------- */
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 26px 26px 22px;
+    box-shadow: var(--shadow);
+  }
+  .panel + .panel { margin-top: 20px; }
+  .panel h3 {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .panel .note {
+    font-size: 13.5px;
+    color: var(--text-muted);
+    margin-bottom: 20px;
+    max-width: 68ch;
+  }
+
+  /* ---------- bar chart: pair comparison ---------- */
+  .pair-chart {
+    display: flex;
+    gap: 40px;
+    align-items: flex-end;
+    height: 168px;
+    padding: 0 8px 0;
+    margin-bottom: 6px;
+  }
+  .pair-bar-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    height: 100%;
+    justify-content: flex-end;
+    flex: 1;
+    max-width: 140px;
+  }
+  .pair-bar-wrap {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    height: 100%;
+    align-items: flex-end;
+    position: relative;
+  }
+  .pair-bar {
+    width: 56px;
+    border-radius: 5px 5px 3px 3px;
+    position: relative;
+    transition: filter 0.15s ease, transform 0.15s ease;
+    cursor: default;
+  }
+  @media (prefers-reduced-motion: reduce) { .pair-bar { transition: none; } }
+  .pair-bar:hover { filter: brightness(1.08); transform: translateY(-1px); }
+  .pair-bar.baseline { background: var(--baseline); }
+  .pair-bar.accent { background: var(--accent); }
+  .pair-bar .bar-value {
+    position: absolute;
+    top: -26px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 13.5px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .pair-bar.baseline .bar-value { color: var(--baseline-ink); }
+  .pair-bar.accent .bar-value { color: var(--accent-ink); }
+  .pair-bar-label {
+    font-size: 12.5px;
+    color: var(--text-muted);
+    font-weight: 500;
+    text-align: center;
+  }
+  .pair-charts-row { display: flex; gap: 28px; flex-wrap: wrap; }
+  .pair-chart-col { flex: 1; min-width: 220px; }
+  .pair-chart-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 14px;
+  }
+  .ratio-callout {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px dashed var(--border);
+  }
+  .ratio-callout b { color: var(--accent-ink); font-size: 15px; }
+
+  /* ---------- grouped bar chart (M5) ---------- */
+  .legend {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+  .legend-swatch { width: 11px; height: 11px; border-radius: 3px; }
+  .legend-swatch.accent { background: var(--accent); }
+  .legend-swatch.baseline { background: var(--baseline); }
+
+  .grouped-chart {
+    display: flex;
+    align-items: flex-end;
+    gap: 30px;
+    height: 190px;
+    padding: 0 6px;
+    overflow-x: auto;
+  }
+  .group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    height: 100%;
+    justify-content: flex-end;
+  }
+  .group-bars {
+    display: flex;
+    gap: 6px;
+    align-items: flex-end;
+    height: 100%;
+  }
+  .gbar {
+    width: 22px;
+    border-radius: 4px 4px 2px 2px;
+    position: relative;
+    transition: filter 0.15s ease;
+  }
+  @media (prefers-reduced-motion: reduce) { .gbar { transition: none; } }
+  .gbar:hover { filter: brightness(1.1); }
+  .gbar.accent { background: var(--accent); }
+  .gbar.baseline { background: var(--baseline); }
+  .gbar .gval {
+    position: absolute;
+    top: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--text-faint);
+    white-space: nowrap;
+  }
+  .group-label {
+    font-size: 12.5px;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+
+  /* ---------- evidence table ---------- */
+  table.evidence {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+  }
+  table.evidence th {
+    text-align: left;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    padding: 0 10px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  table.evidence td {
+    padding: 10px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-muted);
+  }
+  table.evidence td.mono { font-family: "IBM Plex Mono", monospace; color: var(--text); }
+  table.evidence tr:last-child td { border-bottom: none; }
+  .table-scroll { overflow-x: auto; }
+  .margin-tag {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--gold);
+    background: var(--gold-bg);
+    padding: 2px 7px;
+    border-radius: 5px;
+  }
+
+  /* ---------- callout ---------- */
+  .callout {
+    border-left: 3px solid var(--accent);
+    background: var(--surface-2);
+    border-radius: 0 8px 8px 0;
+    padding: 16px 18px;
+    font-size: 14px;
+    color: var(--text-muted);
+    margin-top: 18px;
+  }
+  .callout strong { color: var(--text); }
+
+  footer {
+    margin-top: 64px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    font-size: 12.5px;
+    color: var(--text-faint);
+    font-family: "IBM Plex Mono", monospace;
+  }
+
+  @media (max-width: 620px) {
+    .stats { grid-template-columns: 1fr; }
+    .ledger-row { grid-template-columns: 1fr; gap: 6px; }
+    .ledger-row .m { padding-top: 0; }
+    .pair-charts-row { flex-direction: column; }
+  }
+</style>
+
+<div class="page">
+
+  <header>
+    <div class="eyebrow"><span class="dot"></span> VERIFICATION LEDGER · gpu-engine</div>
+    <h1>GPT-2 124M CUDA decode path, verified on a real GPU</h1>
+    <p class="subtitle">
+      Every number below was measured, not estimated — the project's own rule is that
+      nothing lands here until it's run on hardware. Built on <code>CUDA 12.8</code>,
+      measured on a rented <code>RTX 3060</code> on 2026-08-23.
+    </p>
+    <div class="badges">
+      <span class="badge">RTX 3060 · 12GB</span>
+      <span class="badge">driver 580.173.02</span>
+      <span class="badge">commit 9e0ede9</span>
+      <span class="badge">M0–M6 measured · M7 skipped</span>
+    </div>
+  </header>
+
+  <div class="stats">
+    <div class="stat">
+      <div class="value accent num">1.28×</div>
+      <div class="label">continuous vs. static batching — closed-loop capacity, real GPU decode</div>
+    </div>
+    <div class="stat">
+      <div class="value accent num">1.15×</div>
+      <div class="label">continuous vs. static — Poisson arrivals, 500 requests, matched load</div>
+    </div>
+    <div class="stat">
+      <div class="value num">90.1%</div>
+      <div class="label">FP16 vs. FP32 per-step top-1 agreement (non-cascading, teacher-forced)</div>
+    </div>
+  </div>
+
+  <section>
+    <div class="section-head">
+      <h2>Milestone ledger</h2>
+      <span class="tag num">M0–M7</span>
+    </div>
+    <div class="ledger">
+      <div class="ledger-row">
+        <div class="m">M0</div>
+        <div><span class="pill good">VERIFIED</span></div>
+        <div class="finding">Real HF <strong>gpt2</strong> weights exported (497,759,232 bytes, 148 tensors); loader checksum round-trips to <span class="mono">rel_err = 4.6e-15</span>.</div>
+      </div>
+      <div class="ledger-row">
+        <div class="m">M1</div>
+        <div><span class="pill good">VERIFIED</span></div>
+        <div class="finding">CPU-FP32 oracle matches HuggingFace greedy decode exactly — <strong>41/41</strong> prompts (widened from the original 10 mid-verification, still 10/10 on that subset).</div>
+      </div>
+      <div class="ledger-row">
+        <div class="m">M2</div>
+        <div><span class="pill gold">CHARACTERIZED</span></div>
+        <div class="finding">Kernel-level parity passes. End-to-end sequence match is <strong>24/41</strong>, under spec — but every mismatch is a confirmed FP16 near-tie (margins 0.003–0.11), not a defect. Found and fixed a real linking bug along the way.</div>
+      </div>
+      <div class="ledger-row">
+        <div class="m">M3</div>
+        <div><span class="pill gold">PARTIAL</span></div>
+        <div class="finding">Host-side block allocator formally tested. Device-side paging exercised across ~5,000 real decode steps with block rollovers — no dedicated parity harness.</div>
+      </div>
+      <div class="ledger-row">
+        <div class="m">M4</div>
+        <div><span class="pill skip">SKIPPED</span></div>
+        <div class="finding">Kernels were written fused from the start — no unfused variant exists in the codebase to diff a before/after against.</div>
+      </div>
+      <div class="ledger-row">
+        <div class="m">M5</div>
+        <div><span class="pill good">VERIFIED</span></div>
+        <div class="finding">Real batch sweep {1,2,4,8} × 512 steps × 5 reps. CUDA Graphs save a near-constant ~0.12–0.13ms/step. Root-caused an apparent 2.5× anomaly to O(seq_len) attention cost, not clock throttling.</div>
+      </div>
+      <div class="ledger-row">
+        <div class="m">M6</div>
+        <div><span class="pill good">VERIFIED</span></div>
+        <div class="finding">Wired the GPU engine into the scheduler as a real <span class="mono">TokenGenerator</span>. Continuous-vs-static ratio re-measured at <strong>1.15–1.28×</strong> on real compute — down from an earlier mock-generator figure, exactly the revalidation the spec called for.</div>
+      </div>
+      <div class="ledger-row">
+        <div class="m">M7</div>
+        <div><span class="pill skip">SKIPPED</span></div>
+        <div class="finding">Nsight Compute needs <span class="mono">CAP_SYS_ADMIN</span>/<span class="mono">CAP_PERFMON</span>. Confirmed absent on Vast.ai and RunPod containers directly — a platform limit, not a per-host fluke. Costs one claim (fusion occupancy delta).</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>M6 — continuous vs. static batching</h2>
+      <span class="tag">500 requests · output lengths U(16, 512) · batch 8</span>
+    </div>
+    <p class="lede">
+      The first calibration attempt read a flat <strong>1.00×</strong> — a load-testing bug, not a
+      finding: the shared arrival rate was set to 80% of <em>static mode's own</em> ceiling, which keeps
+      static comfortably under-loaded too, so its slot-wasting penalty never gets stressed. Recalibrating
+      off continuous's higher ceiling exposed the real gap.
+    </p>
+    <div class="panel">
+      <div class="pair-charts-row">
+        <div class="pair-chart-col">
+          <div class="pair-chart-title">Closed-loop capacity (req/s)</div>
+          <div class="pair-chart">
+            <div class="pair-bar-group">
+              <div class="pair-bar-wrap">
+                <div class="pair-bar baseline" style="height: 78.2%;"><span class="bar-value num">4.39</span></div>
+              </div>
+              <div class="pair-bar-label">Static</div>
+            </div>
+            <div class="pair-bar-group">
+              <div class="pair-bar-wrap">
+                <div class="pair-bar accent" style="height: 100%;"><span class="bar-value num">5.61</span></div>
+              </div>
+              <div class="pair-bar-label">Continuous</div>
+            </div>
+          </div>
+          <div class="ratio-callout">113.88s vs. 89.08s to clear 500 requests → <b class="num">1.28×</b></div>
+        </div>
+        <div class="pair-chart-col">
+          <div class="pair-chart-title">Poisson arrivals (tok/s)</div>
+          <div class="pair-chart">
+            <div class="pair-bar-group">
+              <div class="pair-bar-wrap">
+                <div class="pair-bar baseline" style="height: 86.7%;"><span class="bar-value num">1,142</span></div>
+              </div>
+              <div class="pair-bar-label">Static</div>
+            </div>
+            <div class="pair-bar-group">
+              <div class="pair-bar-wrap">
+                <div class="pair-bar accent" style="height: 100%;"><span class="bar-value num">1,318</span></div>
+              </div>
+              <div class="pair-bar-label">Continuous</div>
+            </div>
+          </div>
+          <div class="ratio-callout">Same 500 requests, same arrival timings → <b class="num">1.15×</b></div>
+        </div>
+      </div>
+      <div class="callout">
+        <strong>Why not the historical ~3.2×?</strong> Real per-step cost here is dominated by fixed
+        per-layer kernel-launch overhead plus the O(seq_len) attention term (see M5) — a flatter, less
+        batch-sensitive cost profile than a synthetic mock generator's latency, which scales purely with
+        batch size. Plausible, not confirmed — no controlled ablation was run to isolate it. The number
+        wasn't chased higher by re-tuning the load further; that's what the honesty rule is for.
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>M5 — CUDA Graphs launch overhead</h2>
+      <span class="tag">512 steps × 5 reps, CUDA-event wall clock</span>
+    </div>
+    <p class="lede">Graphs save a near-<strong>constant ~0.12–0.13ms</strong> per step regardless of batch size — consistent with eliminating a fixed per-step launch-dispatch cost rather than a data-volume-dependent one.</p>
+    <div class="panel">
+      <div class="legend">
+        <div class="legend-item"><span class="legend-swatch accent"></span> Graphs on</div>
+        <div class="legend-item"><span class="legend-swatch baseline"></span> Graphs off</div>
+      </div>
+      <div class="grouped-chart">
+        <div class="group">
+          <div class="group-bars">
+            <div class="gbar accent" style="height: 90.7%;"><span class="gval num">3.46</span></div>
+            <div class="gbar baseline" style="height: 94.1%;"><span class="gval num">3.59</span></div>
+          </div>
+          <div class="group-label">batch 1</div>
+        </div>
+        <div class="group">
+          <div class="group-bars">
+            <div class="gbar accent" style="height: 93.7%;"><span class="gval num">3.58</span></div>
+            <div class="gbar baseline" style="height: 97.0%;"><span class="gval num">3.70</span></div>
+          </div>
+          <div class="group-label">batch 2</div>
+        </div>
+        <div class="group">
+          <div class="group-bars">
+            <div class="gbar accent" style="height: 94.7%;"><span class="gval num">3.62</span></div>
+            <div class="gbar baseline" style="height: 98.0%;"><span class="gval num">3.74</span></div>
+          </div>
+          <div class="group-label">batch 4</div>
+        </div>
+        <div class="group">
+          <div class="group-bars">
+            <div class="gbar accent" style="height: 96.8%;"><span class="gval num">3.70</span></div>
+            <div class="gbar baseline" style="height: 100%;"><span class="gval num">3.82</span></div>
+          </div>
+          <div class="group-label">batch 8</div>
+        </div>
+      </div>
+      <div class="callout">
+        <strong>Methodology note:</strong> each bar is the median ms/step across a single 512-step run
+        where the same sequences decode continuously — so it reflects the midpoint of an 8→519 token
+        context growth, not a fixed short-context number. A per-step probe confirmed clean linear
+        growth (1.39ms → 5.96ms) matching paged attention's expected O(seq_len) cost — ruled out clock
+        throttling directly via <span class="mono">nvidia-smi</span> mid-run (SM clock at 1950/2130MHz, no active throttle reasons).
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>M2 — is 58.5% sequence match actually fine?</h2>
+      <span class="tag">FP32 logit-margin analysis at each divergence point</span>
+    </div>
+    <p class="lede">
+      Autoregressive greedy decode cascades: one FP16 rounding flip early in a 32-token sequence
+      contaminates every token after it, so a whole-sequence exact-match metric understates the real
+      numerical accuracy. Checking the CPU-FP32 oracle's own logit margin at each divergence point tells
+      the real story — GPT-2's output distribution has frequent razor-thin top-2 ties.
+    </p>
+    <div class="panel">
+      <div class="table-scroll">
+        <table class="evidence">
+          <thead>
+            <tr><th>Expected</th><th>GPU picked</th><th>CPU FP32 rank</th><th>Top-1 vs. top-2 margin</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="mono">11</td><td class="mono">13</td><td>rank 2 of 50,257</td><td><span class="margin-tag num">Δ 0.0071</span></td></tr>
+            <tr><td class="mono">582</td><td class="mono">1692</td><td>rank 2 of 50,257</td><td><span class="margin-tag num">Δ 0.0044</span></td></tr>
+            <tr><td class="mono">11</td><td class="mono">326</td><td>rank 2 of 50,257</td><td><span class="margin-tag num">Δ 0.0369</span></td></tr>
+            <tr><td class="mono">1910</td><td class="mono">4283</td><td>rank 2 of 50,257</td><td><span class="margin-tag num">Δ 0.0048</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout">
+        Across all 17 mismatches in the 41-prompt set, <strong>100%</strong> land on the CPU oracle's exact
+        rank-2 (16 cases) or rank-3 (1 case) token, on logits around −50 to −100 — sub-0.2% relative gaps.
+        A teacher-forced, non-cascading probe (feeding the true history at every step instead of a
+        possibly-wrong prior guess) puts real per-step agreement at <strong>1,370/1,520 (90.1%)</strong>.
+        No kernel bug found anywhere in the pipeline.
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <span>Full evidence &amp; reproduction commands: <span class="mono">gpu-engine/VERIFICATION.md</span></span>
+    <span>Nothing here is a resume claim until it's measured and logged.</span>
+  </footer>
+
+</div>
