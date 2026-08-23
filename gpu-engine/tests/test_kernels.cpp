@@ -267,5 +267,8 @@ TEST_CASE("end-to-end: GPU engine greedy decode matches CPU oracle on >=8/10 pro
     }
 
     MESSAGE("GPU engine exact top-1 match: ", matches, "/", total);
-    CHECK(matches >= 8);
+    // >=8/10 in CLAUDE.md's M2 acceptance criteria is an 80% bar on the
+    // original 10-prompt set; scale it to whatever N parity_reference.json
+    // actually has (see VERIFICATION.md for why the set was widened).
+    CHECK(matches >= (total * 4) / 5);
 }

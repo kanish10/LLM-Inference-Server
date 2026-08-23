@@ -61,6 +61,9 @@ if(CMAKE_CUDA_COMPILER)
 
     add_library(gpu_kernels STATIC
         src/loader.cpp
+        src/model.cpp
+        src/kv_cache_pool.cpp
+        src/reference/weights_loader.cpp
         src/kv_cache.cu
         src/kernels/embedding.cu
         src/kernels/layernorm.cu
