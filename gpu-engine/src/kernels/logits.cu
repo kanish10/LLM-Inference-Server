@@ -1,4 +1,5 @@
 #include "engine/kernels.h"
+#include "engine/tune_params.h"
 
 #include <cfloat>
 
@@ -15,7 +16,7 @@
 namespace kernels {
 namespace {
 
-__global__ void argmax_kernel(int* out_tokens, const half* logits, int vocab_size) {
+__global__ void ARGMAX_LAUNCH_BOUNDS argmax_kernel(int* out_tokens, const half* logits, int vocab_size) {
     extern __shared__ unsigned char smem_raw[];
     float* smem_val = reinterpret_cast<float*>(smem_raw);
     int* smem_idx = reinterpret_cast<int*>(smem_val + blockDim.x);
@@ -51,7 +52,7 @@ __global__ void argmax_kernel(int* out_tokens, const half* logits, int vocab_siz
 
 void launch_argmax(int* out_tokens, const half* logits, int batch, int vocab_size,
                     cudaStream_t stream) {
-    const int threads = 256;
+    const int threads = ARGMAX_THREADS;
     const size_t smem_bytes = static_cast<size_t>(threads) * (sizeof(float) + sizeof(int));
     argmax_kernel<<<batch, threads, smem_bytes, stream>>>(out_tokens, logits, vocab_size);
 }

@@ -54,3 +54,10 @@ CMake auto-detects a CUDA compiler. On a machine that has one, the same
 
 None of this has been run yet -- see `VERIFICATION.md` for exactly what's
 been checked and what a first real run should expect to shake out.
+
+## Kernel tuning harness
+
+`bench/kernel_bench.cu` and `bench/build_candidate.sh` build, check, and
+time one kernel under a given set of compile flags and launch parameters.
+[PerfLens](https://github.com/kanish10/PerfLens)'s `perflens tune` uses them
+to search those settings. See [`bench/TUNING.md`](bench/TUNING.md).
