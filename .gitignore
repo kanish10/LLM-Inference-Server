@@ -41,3 +41,6 @@ gpu-engine/models/*.json
 
 ## Logs
 *.log
+
+## Tuning harness
+gpu-engine/bench/__pycache__/
