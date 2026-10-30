@@ -1,4 +1,5 @@
 #include "engine/kernels.h"
+#include "engine/tune_params.h"
 
 namespace kernels {
 namespace {
@@ -6,7 +7,7 @@ namespace {
 // One block per batch row, blockDim.x threads (power of two) cooperate on
 // two tree reductions (mean, then variance) via shared memory. FP32
 // accumulation throughout even though in/out tensors are half.
-__global__ void add_layernorm_kernel(half* out, half* residual_out, const half* x,
+__global__ void LN_LAUNCH_BOUNDS add_layernorm_kernel(half* out, half* residual_out, const half* x,
                                       const half* residual_in, const half* gamma,
                                       const half* beta, int d_model, float eps) {
     extern __shared__ float smem[];
@@ -56,7 +57,7 @@ __global__ void add_layernorm_kernel(half* out, half* residual_out, const half* 
 void launch_add_layernorm(half* out, half* residual_out, const half* x, const half* residual_in,
                            const half* gamma, const half* beta, int batch, int d_model, float eps,
                            cudaStream_t stream) {
-    const int threads = 256;
+    const int threads = LN_THREADS;
     const size_t smem_bytes = threads * sizeof(float);
     add_layernorm_kernel<<<batch, threads, smem_bytes, stream>>>(out, residual_out, x, residual_in,
                                                                    gamma, beta, d_model, eps);
