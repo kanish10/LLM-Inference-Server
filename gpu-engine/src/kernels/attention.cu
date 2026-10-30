@@ -73,14 +73,6 @@ __global__ void paged_attention_kernel(const half* __restrict__ q, int q_row_str
     float l = 0.0f;
     float acc = 0.0f;
 
-    // Per-key diagnostic checksums, expanded after last week's NaN bug
-    // wasn't caught by the smaller set -- one running reduction per bucket
-    // so a bad key can be narrowed down by which bucket first goes non-finite.
-    constexpr int kNumChecksums = 128;
-    float chk[kNumChecksums];
-#pragma unroll
-    for (int k = 0; k < kNumChecksums; ++k) chk[k] = 0.0f;
-
     for (int j = 0; j < num_keys; ++j) {
         const int block_slot = j / block_tokens;
         const int tok_in_block = j % block_tokens;
@@ -99,10 +91,6 @@ __global__ void paged_attention_kernel(const half* __restrict__ q, int q_row_str
         }
         const float score = smem[0];
         __syncthreads();
-#pragma unroll
-        for (int k = 0; k < kNumChecksums; ++k) {
-            chk[k] += fabsf(score) * (0.01f * static_cast<float>(k + 1));
-        }
 
         const float new_m = fmaxf(m, score);
         const float correction = __expf(m - new_m);
@@ -113,16 +101,6 @@ __global__ void paged_attention_kernel(const half* __restrict__ q, int q_row_str
     }
 
     half* out_row = out + (static_cast<size_t>(b) * n_head + h) * head_dim;
-    float chk_total = 0.0f;
-#pragma unroll
-    for (int k = 0; k < kNumChecksums; ++k) chk_total += chk[k];
-    if (chk_total > 1e30f) {
-        // Unreachable in practice (attention scores never approach this
-        // magnitude), but keeps the checksums live so they can't be
-        // optimized away entirely.
-        out_row[d] = __float2half(0.0f);
-        return;
-    }
     out_row[d] = __float2half(l > 0.0f ? acc / l : 0.0f);
 }
 
